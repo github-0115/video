@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	grpc "video/grpc"
 )
 
 var (
@@ -39,8 +38,6 @@ func main() {
 		return
 	}
 
-	grpc.InitDedupClient(*addr)
-
 	fileLists := Readlist(*inputPath)
 	fmt.Println(len(fileLists))
 	framesPaths := make([]string, 0, 0)
@@ -60,8 +57,6 @@ func main() {
 }
 
 func DecodeAll(videoPath string, saveDir string) (string, error) {
-	//	var path = "C:\\Users\\deepir\\Desktop\\videotest\\test"
-	//	return path, nil
 
 	framePath := saveDir + "/frames"
 	//判断目录是否存在
@@ -108,22 +103,36 @@ func Decode(path string, saveDir string, threshold float64) error {
 		return err
 	}
 
-	for idx, info := range infos {
-		imagePath, err := filepath.Abs(filepath.Join(path, info.Name()))
-		fmt.Println(imagePath)
+	lastImagePath, err := filepath.Abs(filepath.Join(path, infos[0].Name()))
+	if err != nil {
+		fmt.Println("read frame path error " + err.Error())
+		return err
+	}
+
+	lastFrame, err := ReadFrame(lastImagePath)
+	if err != nil {
+		fmt.Println(fmt.Sprintf("Read image file %s failed ", lastImagePath) + err.Error())
+		return err
+	}
+
+	for _, info := range infos[1:] {
+
+		currentImagePath, err := filepath.Abs(filepath.Join(path, info.Name()))
+		fmt.Println(currentImagePath)
 		if err != nil {
 			fmt.Println("read frame path error " + err.Error())
 			continue
 		}
-		frame, err := ReadFrame(imagePath)
+		currentFrame, err := ReadFrame(currentImagePath)
 		if err != nil {
-			fmt.Println(fmt.Sprintf("Read image file %s failed ", imagePath) + err.Error())
+			fmt.Println(fmt.Sprintf("Read image file %s failed ", currentImagePath) + err.Error())
 			continue
 		}
-		//
-		similar := ContrastFrame(path, idx, frame, threshold)
+
+		similar := ContrastFrame(lastFrame, currentFrame, threshold)
 		if !similar {
-			SaveFrame(imagePath, saveDir)
+			lastFrame = currentFrame
+			SaveFrame(currentImagePath, saveDir)
 		}
 	}
 
@@ -131,12 +140,9 @@ func Decode(path string, saveDir string, threshold float64) error {
 	return nil
 }
 
-func ContrastFrame(videoId string, frameId int, currentFrame []byte, threshold float64) bool {
-	_, score, err := grpc.IsStaticVideo(videoId, int64(frameId), currentFrame)
-	if err != nil {
-		return false
-	}
-	return score >= threshold
+func ContrastFrame(lastFrame []byte, currentFrame []byte, threshold float64) bool {
+
+	return false
 }
 
 func ReadFrame(path string) ([]byte, error) {

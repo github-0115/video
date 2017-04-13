@@ -11,12 +11,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	grpc "video/grpc"
 )
 
 var (
 	inputPath = flag.String("input", "", "read file path")
 	outputDir = flag.String("output", "", "file save dir path")
 	threshold = flag.Float64("threshold", 0, "threshold value ")
+	addr      = flag.String("addr", "", "client address")
 )
 
 func main() {
@@ -31,6 +33,13 @@ func main() {
 		fmt.Println("必须指定文件保存目录")
 		return
 	}
+
+	if *addr == "" {
+		fmt.Println("必须指定client address")
+		return
+	}
+
+	grpc.InitDedupClient(*addr)
 
 	fileLists := Readlist(*inputPath)
 	fmt.Println(len(fileLists))
@@ -51,8 +60,8 @@ func main() {
 }
 
 func DecodeAll(videoPath string, saveDir string) (string, error) {
-	var path = "C:\\Users\\deepir\\Desktop\\test"
-	return path, nil
+	//	var path = "C:\\Users\\deepir\\Desktop\\videotest\\test"
+	//	return path, nil
 
 	framePath := saveDir + "/frames"
 	//判断目录是否存在
@@ -62,7 +71,7 @@ func DecodeAll(videoPath string, saveDir string) (string, error) {
 		return "", err
 	}
 
-	cmd := exec.Command("ls", "-a", "-l")
+	cmd := exec.Command("ffmpeg", "-i", videoPath, "-f", "image2", "-vf", "fps=fps=1", filepath.Join(framePath, "%10d.png"))
 	// 获取输出对象，可以从该对象中读取输出结果
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -122,6 +131,14 @@ func Decode(path string, saveDir string, threshold float64) error {
 	return nil
 }
 
+func ContrastFrame(videoId string, frameId int, currentFrame []byte, threshold float64) bool {
+	_, score, err := grpc.IsStaticVideo(videoId, int64(frameId), currentFrame)
+	if err != nil {
+		return false
+	}
+	return score >= threshold
+}
+
 func ReadFrame(path string) ([]byte, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -157,11 +174,6 @@ func SaveFrame(imagePath string, saveDir string) error {
 	}
 
 	return nil
-}
-
-func ContrastFrame(videoId string, frameId int, currentFrame []byte, threshold float64) bool {
-	fmt.Println("-----")
-	return false
 }
 
 func Readlist(path string) []string {
